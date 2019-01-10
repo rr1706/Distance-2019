@@ -3,7 +3,8 @@
  * the RoboRio when certain sensor patterns are found.
  * 
  * Requires: https://github.com/rr1706/vl53l0x-arduino
- *           https://github.com/rr1706/SoftwareWire
+ *           https://github.com/rr1706/vl53l0x-rr1706
+ *           https://github.com/Testato/SoftwareWire
  */
 
 #include <SoftwareWire.h>
@@ -14,6 +15,7 @@
 #define NUM_LEDS 60
 #define CLOCK_PIN 13
 #define DATA_PIN 12
+#define COMMON_I2C_CLOCK_PIN 2
 
 #define NUM_SENSORS 8
 
@@ -31,7 +33,7 @@
 #define SENSOR_GRIPPER 4
 
 #define IS_I2C_SLAVE false
-#define USE_DIAG_LIGHTS true
+#define USE_DIAG_LIGHTS false
 
 template< typename T, size_t N > size_t ArraySize (T (&) [N]){ return N; }
 
@@ -39,35 +41,13 @@ const String goodValues[] = {"12","2","3","23","13","24","34","124","134"};
 const String actionableValues[] = {"1","4","14","123","234","1234"};
 const String wallValues[] = {"123","234","1234"};
 
-CRGB leds[NUM_LEDS] = {CRGB::Blue};
+CRGB leds[USE_DIAG_LIGHTS ? NUM_LEDS : 1] = {CRGB::Blue};
 
 // Create an array of Software I2C interfaces, one for each sensor.
-SoftwareWire wires[NUM_SENSORS] = {
-  SoftwareWire(3,2, true, false),
-  SoftwareWire(4,2),
-  SoftwareWire(5,2),
-  SoftwareWire(6,2),
-  SoftwareWire(7,2),
-  SoftwareWire(8,2),
-  SoftwareWire(9,2),
-  SoftwareWire(10,2)
-};
+SoftwareWire* wires[NUM_SENSORS];
+SoftVL53L0X* sensors[NUM_SENSORS];
 
-SoftVL53L0X sensors[NUM_SENSORS] = {
-  SoftVL53L0X(&wires[0]),
-  SoftVL53L0X(&wires[1]),
-  SoftVL53L0X(&wires[2]),
-  SoftVL53L0X(&wires[3]),
-  SoftVL53L0X(&wires[4]),
-  SoftVL53L0X(&wires[5]),
-  SoftVL53L0X(&wires[6]),
-  SoftVL53L0X(&wires[7])
-};
-
-
-short distances[NUM_SENSORS] = {
-    0, 0, 0, 0, 0, 0, 0, 0
-  };
+short distances[NUM_SENSORS] = {0};
 byte  readIndex = 0;
 int   currentGoodSensorCount = GOOD_SENSOR_DELAY;
 bool  debugging = false;
@@ -91,14 +71,15 @@ void setup() {
   
   // Initialize the range finders...
   for (int i = 0; i < NUM_SENSORS; i++) {
-    //initSensor(wires[i]);
-    wires[i].begin();
+    wires[i] = new SoftwareWire(i + 3, COMMON_I2C_CLOCK_PIN);
+    wires[i]->begin();
+    sensors[i] = new SoftVL53L0X(wires[i]);
     Serial.print("Initializing sensor "); Serial.println(i);
-    sensors[i].init(false);
+    sensors[i]->init(false);
     Serial.print("Setting timeout "); Serial.println(i);
-    sensors[i].setTimeout(50);
+    sensors[i]->setTimeout(50);
     Serial.print("Starting continuous sensing "); Serial.println(i);
-    sensors[i].startContinuous();
+    sensors[i]->startContinuous();
   }
 
   // Set up analog pins as outputs to send signals to RoboRIO.
@@ -156,12 +137,12 @@ void loop() {
   for (int i = 0; i < NUM_SENSORS; i++) {
     short lastReading = distances[i];
     //if (debugging) { Serial.print("Reading sensor #"); Serial.println(i); }
-    distances[i] = sensors[i].readRangeContinuousMillimeters(); //processSensor(wires[i], distances[i]);
-    if (sensors[i].timeoutOccurred()) {
+    distances[i] = sensors[i]->readRangeContinuousMillimeters(); //processSensor(wires[i], distances[i]);
+    if (sensors[i]->timeoutOccurred()) {
       if (debugging) { Serial.print("Timeour detected, re-initializing sensor #"); Serial.print(i); }
-      sensors[i].init();
-      sensors[i].setTimeout(50);
-      sensors[i].startContinuous();
+      sensors[i]->init();
+      sensors[i]->setTimeout(50);
+      sensors[i]->startContinuous();
       distances[i] = lastReading;
       if (debugging) { Serial.println("..."); }
     }
