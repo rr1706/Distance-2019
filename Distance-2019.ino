@@ -11,13 +11,14 @@
 #include <Wire.h>
 #include <FastLED.h>
 #include <SoftVL53L0X.h>
+#include <VL53L1X.h>
 
-#define NUM_LEDS 60
-#define CLOCK_PIN 13
-#define DATA_PIN 12
+#define NUM_LEDS 20
+#define LED_CLOCK_PIN 13
+#define LED_DATA_PIN 12
 #define COMMON_I2C_CLOCK_PIN 2
 
-#define NUM_SENSORS 8
+#define NUM_SENSORS 7
 
 #define MIN_GRIP_VALUE 22
 #define MAX_GRIP_VALUE 130
@@ -33,7 +34,7 @@
 #define SENSOR_GRIPPER 4
 
 #define IS_I2C_SLAVE false
-#define USE_DIAG_LIGHTS false
+#define USE_DIAG_LIGHTS true
 
 template< typename T, size_t N > size_t ArraySize (T (&) [N]){ return N; }
 
@@ -54,6 +55,8 @@ bool  debugging = false;
 int   counter = 0;
 int   heartbeat = 0;
 
+//VL53L1X extraSensor;
+
 void setup() {
 
   // Wait for serial port to come online.
@@ -67,6 +70,12 @@ void setup() {
     Wire.begin(8);
     Wire.onRequest(requestEvent);
     Wire.onReceive(receiveEvent);
+  } else {
+    /*
+    if (!extraSensor.init()) {
+      Serial.println("No VL53L1X detected.");
+    }
+    */
   }
   
   // Initialize the range finders...
@@ -95,7 +104,7 @@ void setup() {
 
   if (USE_DIAG_LIGHTS) {
     // LEDs
-    FastLED.addLeds<APA102, DATA_PIN, CLOCK_PIN, BGR, DATA_RATE_MHZ(12)>(leds, NUM_LEDS);
+    FastLED.addLeds<APA102, LED_DATA_PIN, LED_CLOCK_PIN, BGR, DATA_RATE_MHZ(12)>(leds, NUM_LEDS);
     // The Brightness maxium is 255
     FastLED.setBrightness(10);
     for (int i = 0; i < NUM_LEDS; i++) {
