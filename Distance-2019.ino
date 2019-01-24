@@ -13,12 +13,14 @@
 #include <SoftVL53L0X.h>
 #include <VL53L1X.h>
 
+// For LED feedback
 #define NUM_LEDS 20
 #define LED_CLOCK_PIN 13
 #define LED_DATA_PIN 12
+
 #define COMMON_I2C_CLOCK_PIN 2
 
-#define NUM_SENSORS 7
+#define NUM_SENSORS 8
 
 #define MIN_GRIP_VALUE 22
 #define MAX_GRIP_VALUE 130
@@ -34,7 +36,7 @@
 #define SENSOR_GRIPPER 4
 
 #define IS_I2C_SLAVE false
-#define USE_DIAG_LIGHTS true
+#define USE_DIAG_LIGHTS false
 
 template< typename T, size_t N > size_t ArraySize (T (&) [N]){ return N; }
 
