@@ -10,8 +10,7 @@
 #include <SoftwareWire.h>
 #include <Wire.h>
 #include <FastLED.h>
-#include <SoftVL53L0X.h>
-#include <VL53L1X.h>
+#include <SoftVL53L1X.h>
 
 // For LED feedback
 #define NUM_LEDS 20
@@ -19,8 +18,11 @@
 #define LED_DATA_PIN 12
 
 #define COMMON_I2C_CLOCK_PIN 2
+#define NUM_SENSORS 2
 
-#define NUM_SENSORS 8
+#define IS_I2C_SLAVE false
+#define USE_DIAG_LIGHTS false
+#define USE_OLED_DISPLAY false
 
 #define MIN_GRIP_VALUE 22
 #define MAX_GRIP_VALUE 130
@@ -35,9 +37,6 @@
 #define GOOD_SENSOR_DELAY 5
 #define SENSOR_GRIPPER 4
 
-#define IS_I2C_SLAVE false
-#define USE_DIAG_LIGHTS false
-
 template< typename T, size_t N > size_t ArraySize (T (&) [N]){ return N; }
 
 const String goodValues[] = {"12","2","3","23","13","24","34","124","134"};
@@ -48,7 +47,8 @@ CRGB leds[USE_DIAG_LIGHTS ? NUM_LEDS : 1] = {CRGB::Blue};
 
 // Create an array of Software I2C interfaces, one for each sensor.
 SoftwareWire* wires[NUM_SENSORS];
-SoftVL53L0X* sensors[NUM_SENSORS];
+SoftVL53L1X* sensors[NUM_SENSORS];
+SoftwareWire oledDisplayWire(10, COMMON_I2C_CLOCK_PIN, true, false);
 
 short distances[NUM_SENSORS] = {0};
 byte  readIndex = 0;
@@ -56,8 +56,6 @@ int   currentGoodSensorCount = GOOD_SENSOR_DELAY;
 bool  debugging = false;
 int   counter = 0;
 int   heartbeat = 0;
-
-//VL53L1X extraSensor;
 
 void setup() {
 
@@ -73,24 +71,22 @@ void setup() {
     Wire.onRequest(requestEvent);
     Wire.onReceive(receiveEvent);
   } else {
-    /*
-    if (!extraSensor.init()) {
-      Serial.println("No VL53L1X detected.");
-    }
-    */
   }
   
   // Initialize the range finders...
   for (int i = 0; i < NUM_SENSORS; i++) {
     wires[i] = new SoftwareWire(i + 3, COMMON_I2C_CLOCK_PIN);
     wires[i]->begin();
-    sensors[i] = new SoftVL53L0X(wires[i]);
-    Serial.print("Initializing sensor "); Serial.println(i);
-    sensors[i]->init(false);
-    Serial.print("Setting timeout "); Serial.println(i);
-    sensors[i]->setTimeout(50);
-    Serial.print("Starting continuous sensing "); Serial.println(i);
-    sensors[i]->startContinuous();
+    sensors[i] = new SoftVL53L1X(wires[i]);
+
+    if (!sensors[i]->init()) {
+      Serial.print("Sensor not available in socket #"); Serial.println(i);
+    } else {
+      sensors[i]->setTimeout(500);
+      sensors[i]->setDistanceMode(VL53L1X::Long);
+      sensors[i]->setMeasurementTimingBudget(50000);
+      sensors[i]->startContinuous(50);
+    }
   }
 
   // Set up analog pins as outputs to send signals to RoboRIO.
@@ -112,6 +108,9 @@ void setup() {
     for (int i = 0; i < NUM_LEDS; i++) {
      // leds[i] = CRGB::Blue;
     }
+  } else {
+    //oledDisplayWire.begin();
+    //initOledDisplay(oledDisplayWire);
   }
 
   Serial.println("Ready for action.  Enter 1 to enable debugging, or 0 to disable.");
@@ -148,12 +147,15 @@ void loop() {
   for (int i = 0; i < NUM_SENSORS; i++) {
     short lastReading = distances[i];
     //if (debugging) { Serial.print("Reading sensor #"); Serial.println(i); }
-    distances[i] = sensors[i]->readRangeContinuousMillimeters(); //processSensor(wires[i], distances[i]);
+    distances[i] = sensors[i]->read(); //processSensor(wires[i], distances[i]);
     if (sensors[i]->timeoutOccurred()) {
       if (debugging) { Serial.print("Timeour detected, re-initializing sensor #"); Serial.print(i); }
-      sensors[i]->init();
-      sensors[i]->setTimeout(50);
-      sensors[i]->startContinuous();
+      if (sensors[i]->init()) {
+        sensors[i]->setTimeout(500);
+        sensors[i]->setDistanceMode(VL53L1X::Long);
+        sensors[i]->setMeasurementTimingBudget(50000);
+        sensors[i]->startContinuous(50);
+      }
       distances[i] = lastReading;
       if (debugging) { Serial.println("..."); }
     }
