@@ -6,7 +6,7 @@
 #define WRITE_RAM_OP ((byte)0x40)
 
 
-int values[8];
+//int values[8];
 
 int writeCmd(SoftwareWire &myWire, byte cmd) {
   myWire.beginTransmission(OLED_ADDRESS);
@@ -14,7 +14,7 @@ int writeCmd(SoftwareWire &myWire, byte cmd) {
   myWire.write(cmd);
   int code = 0;
   if ((code = myWire.endTransmission(true)) != 0) {
-    Serial.print("Error writing command: "); Serial.println(code);
+    //Serial.print("Error writing command: "); Serial.println(code);
     return code;
   }
   return 0;
@@ -29,7 +29,7 @@ int writeDoubleCmd(SoftwareWire &myWire, byte cmd1, byte cmd2) {
   myWire.write(buffer, 3);
   int code = 0;
   if ((code = myWire.endTransmission(true)) != 0) {
-    Serial.print("Error writing command: "); Serial.println(code);
+    //Serial.print("Error writing command: "); Serial.println(code);
     return code;
   }
   return 0;
@@ -52,7 +52,7 @@ int writeData(SoftwareWire &myWire, byte* data, int count) {
   myWire.write(data, count);
   int code = 0;
   if ((code = myWire.endTransmission(true)) != 0) {
-    Serial.print("Error writing Data: "); Serial.println(code);
+    //Serial.print("Error writing Data: "); Serial.println(code);
     return code;
   }
   return 0;

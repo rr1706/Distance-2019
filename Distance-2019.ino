@@ -18,7 +18,7 @@
 #define LED_DATA_PIN 12
 
 #define COMMON_I2C_CLOCK_PIN 2
-#define NUM_SENSORS 2
+#define NUM_SENSORS 3
 
 #define IS_I2C_SLAVE false
 #define USE_DIAG_LIGHTS false
@@ -108,9 +108,9 @@ void setup() {
     for (int i = 0; i < NUM_LEDS; i++) {
      // leds[i] = CRGB::Blue;
     }
-  } else {
-    //oledDisplayWire.begin();
-    //initOledDisplay(oledDisplayWire);
+  } else if (USE_OLED_DISPLAY) {
+    oledDisplayWire.begin();
+    initOledDisplay(oledDisplayWire);
   }
 
   Serial.println("Ready for action.  Enter 1 to enable debugging, or 0 to disable.");
@@ -255,6 +255,12 @@ void loop() {
     }
     FastLED.show();
   }
+
+  if (USE_OLED_DISPLAY) {
+    for (int q = 0; q < NUM_SENSORS; q++) {
+      drawLine(oledDisplayWire, q, distances[q] / 10);
+    }
+  }
   
   if (!IS_I2C_SLAVE) {
     counter++;
@@ -264,7 +270,7 @@ void loop() {
     }
   }
   
-  delay(5);
+  //delay(5);
 }
 
 bool checkForWall(short distances[], int threshold) {
