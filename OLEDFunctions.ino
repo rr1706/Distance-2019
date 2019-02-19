@@ -79,7 +79,7 @@ void initOledDisplay(SoftwareWire &myWire) {
   writeCmd(myWire, (byte)0x40);  // Set Start line to 0
   writeDoubleCmd(myWire, 0x81, 0xCF);  // Contrast control
   writeCmd(myWire, 0x32);              // Set pump voltage
-  writeDoubleCmd(myWire, 0xD9, 0xF1);  // Pre-cahrge period
+  writeDoubleCmd(myWire, 0xD9, 0x22);  // Pre-cahrge period
   writeDoubleCmd(myWire, 0xAD, 0x8B);
   
   writeCmd(myWire, (byte)0xB0);  // Set page 0

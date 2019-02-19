@@ -14,14 +14,14 @@
 
 // For LED feedback
 #define NUM_LEDS 20
-#define LED_CLOCK_PIN 13
 #define LED_DATA_PIN 12
+#define LED_CLOCK_PIN 13
 
 #define COMMON_I2C_CLOCK_PIN 2
-#define NUM_SENSORS 3
+#define NUM_SENSORS 2
 
 #define IS_I2C_SLAVE false
-#define USE_DIAG_LIGHTS false
+#define USE_DIAG_LIGHTS true
 #define USE_OLED_DISPLAY false
 
 #define MIN_GRIP_VALUE 22
@@ -48,12 +48,12 @@ CRGB leds[USE_DIAG_LIGHTS ? NUM_LEDS : 1] = {CRGB::Blue};
 // Create an array of Software I2C interfaces, one for each sensor.
 SoftwareWire* wires[NUM_SENSORS];
 SoftVL53L1X* sensors[NUM_SENSORS];
-SoftwareWire oledDisplayWire(10, COMMON_I2C_CLOCK_PIN, true, false);
+SoftwareWire *oledDisplayWire;
 
-short distances[NUM_SENSORS] = {0};
+unsigned short distances[NUM_SENSORS] = {0};
 byte  readIndex = 0;
-int   currentGoodSensorCount = GOOD_SENSOR_DELAY;
-bool  debugging = false;
+int   currentGoodReadingCount = GOOD_SENSOR_DELAY;
+bool  debugging = true;
 int   counter = 0;
 int   heartbeat = 0;
 
@@ -109,8 +109,9 @@ void setup() {
      // leds[i] = CRGB::Blue;
     }
   } else if (USE_OLED_DISPLAY) {
-    oledDisplayWire.begin();
-    initOledDisplay(oledDisplayWire);
+    oledDisplayWire = new SoftwareWire(10, COMMON_I2C_CLOCK_PIN, true, false);
+    oledDisplayWire->begin();
+    initOledDisplay(*oledDisplayWire);
   }
 
   Serial.println("Ready for action.  Enter 1 to enable debugging, or 0 to disable.");
@@ -173,9 +174,9 @@ void loop() {
 
   // Add delay to prevent false positives.
   if (!cubeInPosition) {
-    currentGoodSensorCount = GOOD_SENSOR_DELAY;
+    currentGoodReadingCount = GOOD_SENSOR_DELAY;
   } else {
-    currentGoodSensorCount = max(0, currentGoodSensorCount - 1);
+    currentGoodReadingCount = max(0, currentGoodReadingCount - 1);
   }
 
   // Set outputs
@@ -183,7 +184,7 @@ void loop() {
   digitalWrite(A0, !hasCubeHigh);
 
   // A1 --> Cube in good position
-  digitalWrite(A1, cubeInPosition && (currentGoodSensorCount == 0));
+  digitalWrite(A1, cubeInPosition && (currentGoodReadingCount == 0));
 
   // A2 --> We think we're up against a wall.
   digitalWrite(A2, againstWall);
@@ -258,13 +259,13 @@ void loop() {
 
   if (USE_OLED_DISPLAY) {
     for (int q = 0; q < NUM_SENSORS; q++) {
-      drawLine(oledDisplayWire, q, distances[q] / 10);
+      drawLine(*oledDisplayWire, q, distances[q] / 32);
     }
   }
   
   if (!IS_I2C_SLAVE) {
     counter++;
-    if (counter % 30 == 0) {
+    if (counter % 10 == 0) {
       heartbeat = 1 - heartbeat;
       digitalWrite(A5, heartbeat);
     }
