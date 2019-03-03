@@ -14,7 +14,7 @@ int writeCmd(SoftwareWire &myWire, byte cmd) {
   myWire.write(cmd);
   int code = 0;
   if ((code = myWire.endTransmission(true)) != 0) {
-    //Serial.print("Error writing command: "); Serial.println(code);
+    Serial.print("Error writing command: "); Serial.println(code);
     return code;
   }
   return 0;
@@ -63,10 +63,11 @@ void drawLine(SoftwareWire &myWire, int page, int value) {
   for (int i = 0; i < 132; i++) {
     buffer[i] = (value > i) ? 0x03C : 0;
   }
-  writeCmd(myWire, (byte)0xB0 + page);  // Set page 0
+  writeCmd(myWire, (byte)0xB0 + page);  // Set page
   writeCmd(myWire, (byte)0x00);  // Set Column 0
   writeCmd(myWire, (byte)0x10);  // Set Column 0
   if (writeData(myWire, buffer, 132) != 0) {
+    Serial.println("Re-initializing display");
     initOledDisplay(myWire);
   }
 }

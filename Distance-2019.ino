@@ -18,10 +18,10 @@
 #define LED_CLOCK_PIN 13
 
 #define COMMON_I2C_CLOCK_PIN 2
-#define NUM_SENSORS 2
+#define NUM_SENSORS 4
 
-#define IS_I2C_SLAVE false
-#define USE_DIAG_LIGHTS true
+#define IS_I2C_SLAVE true
+#define USE_DIAG_LIGHTS false
 #define USE_OLED_DISPLAY false
 
 #define MIN_GRIP_VALUE 22
@@ -53,9 +53,11 @@ SoftwareWire *oledDisplayWire;
 unsigned short distances[NUM_SENSORS] = {0};
 byte  readIndex = 0;
 int   currentGoodReadingCount = GOOD_SENSOR_DELAY;
-bool  debugging = true;
+bool  debugging = false;
 int   counter = 0;
 int   heartbeat = 0;
+bool  sensorsExist[NUM_SENSORS];
+int readCount = 0;
 
 void setup() {
 
@@ -70,7 +72,7 @@ void setup() {
     Wire.begin(8);
     Wire.onRequest(requestEvent);
     Wire.onReceive(receiveEvent);
-  } else {
+    Serial.println("Listening on I2C");
   }
   
   // Initialize the range finders...
@@ -80,8 +82,10 @@ void setup() {
     sensors[i] = new SoftVL53L1X(wires[i]);
 
     if (!sensors[i]->init()) {
+      sensorsExist[i] = false;
       Serial.print("Sensor not available in socket #"); Serial.println(i);
     } else {
+      sensorsExist[i] = true;
       sensors[i]->setTimeout(500);
       sensors[i]->setDistanceMode(VL53L1X::Long);
       sensors[i]->setMeasurementTimingBudget(50000);
@@ -123,15 +127,21 @@ void setup() {
  * Hardware I2C slave function to send data to the I2C master on request.
  */
 void requestEvent() {
-  short data = distances[readIndex] * 10 / 254;
-  Wire.write((data >> 8) & 0xff);
-  Wire.write(data        & 0xff);
+  readCount++;
+  byte dataToSend[8] = {0};
+  for (int i = 0; i < 4; i++) {
+    short data = distances[i]; // * 10 / 254;
+    dataToSend[i * 2] = (data >> 8) & 0xff;
+    dataToSend[i * 2 + 1] = data & 0xff;
+  }
+  Wire.write(dataToSend, 8);
 }
 
 /**
  * Hardware I2C slave function to receive data from the I2C master.
  */
 void receiveEvent(int howMany) {
+  readCount++;
   while (1 < Wire.available()) { // loop through all but the last
     char c = Wire.read(); // receive byte as a character
   }
@@ -148,17 +158,19 @@ void loop() {
   for (int i = 0; i < NUM_SENSORS; i++) {
     short lastReading = distances[i];
     //if (debugging) { Serial.print("Reading sensor #"); Serial.println(i); }
-    distances[i] = sensors[i]->read(); //processSensor(wires[i], distances[i]);
-    if (sensors[i]->timeoutOccurred()) {
-      if (debugging) { Serial.print("Timeour detected, re-initializing sensor #"); Serial.print(i); }
-      if (sensors[i]->init()) {
-        sensors[i]->setTimeout(500);
-        sensors[i]->setDistanceMode(VL53L1X::Long);
-        sensors[i]->setMeasurementTimingBudget(50000);
-        sensors[i]->startContinuous(50);
+    if (sensorsExist[i]) {
+      distances[i] = sensors[i]->read(); //processSensor(wires[i], distances[i]);
+      if (sensors[i]->timeoutOccurred()) {
+        if (debugging) { Serial.print("Timeour detected, re-initializing sensor #"); Serial.print(i); }
+        if (sensors[i]->init()) {
+          sensors[i]->setTimeout(500);
+          sensors[i]->setDistanceMode(VL53L1X::Long);
+          sensors[i]->setMeasurementTimingBudget(50000);
+          sensors[i]->startContinuous(50);
+        }
+        distances[i] = lastReading;
+        if (debugging) { Serial.println("..."); }
       }
-      distances[i] = lastReading;
-      if (debugging) { Serial.println("..."); }
     }
   }
 
@@ -210,7 +222,8 @@ void loop() {
     Serial.print(hasCubeLow ?       "Cube Close       " : "Cube Not Close   ");
     Serial.print(cubeInPosition ?   "Ready            " : "Not Ready        ");
     Serial.print(againstWall ?      "Wall  " : "      ");
-    Serial.println(cubeActionable ? "Strafe" : "");
+    Serial.print(cubeActionable ? "Strafe " : "       ");
+    Serial.println(readCount);
   }
 
   if (Serial.available() > 0) {
@@ -261,6 +274,7 @@ void loop() {
     for (int q = 0; q < NUM_SENSORS; q++) {
       drawLine(*oledDisplayWire, q, distances[q] / 32);
     }
+    drawLine(*oledDisplayWire, NUM_SENSORS, counter % 120);
   }
   
   if (!IS_I2C_SLAVE) {
