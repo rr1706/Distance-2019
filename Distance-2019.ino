@@ -24,18 +24,7 @@
 #define USE_DIAG_LIGHTS false
 #define USE_OLED_DISPLAY false
 
-#define MIN_GRIP_VALUE 22
-#define MAX_GRIP_VALUE 130
-
-#define MIN_CLOSE_VALUE 22
-#define MAX_CLOSE_VALUE 250
-
-#define MIN_CUBE_DISTANCE 30
-#define NEAR_CUBE_DISTANCE 250
-#define MAX_CUBE_DISTANCE 330
-
 #define GOOD_SENSOR_DELAY 5
-#define SENSOR_GRIPPER 7
 
 template< typename T, size_t N > size_t ArraySize (T (&) [N]){ return N; }
 
@@ -58,6 +47,7 @@ int   counter = 0;
 int   heartbeat = 0;
 bool  sensorsExist[NUM_SENSORS];
 int readCount = 0;
+unsigned long time_now = 0;
 
 void setup() {
 
@@ -157,6 +147,8 @@ void receiveEvent(int howMany) {
  */
 void loop() {
 
+  time_now = millis();
+
   // read inputs
   for (int i = 0; i < NUM_SENSORS; i++) {
     short lastReading = distances[i];
@@ -177,40 +169,6 @@ void loop() {
     }
   }
 
-  // Look for good states
-  // Signal cube in gripper if we have a good value between 1.5 and 6 inches.
-  bool hasCubeHigh = (distances[SENSOR_GRIPPER] > MIN_GRIP_VALUE) && (distances[SENSOR_GRIPPER] < MAX_GRIP_VALUE);
-  bool hasCubeLow = (distances[SENSOR_GRIPPER] > MIN_CLOSE_VALUE) && (distances[SENSOR_GRIPPER] < MAX_CLOSE_VALUE);
-  
-  bool cubeInPosition = checkForGoodCubes(distances, NEAR_CUBE_DISTANCE) && !checkForActionableCubes(distances, MAX_CUBE_DISTANCE);
-  bool cubeActionable = checkForActionableCubes(distances, NEAR_CUBE_DISTANCE);
-  bool againstWall = checkForWall(distances, NEAR_CUBE_DISTANCE);
-  bool foundStack = checkForCubeStack(distances);
-
-  // Add delay to prevent false positives.
-  if (!cubeInPosition) {
-    currentGoodReadingCount = GOOD_SENSOR_DELAY;
-  } else {
-    currentGoodReadingCount = max(0, currentGoodReadingCount - 1);
-  }
-
-  // Set outputs
-  // A0 = active-low gripper switch.
-  digitalWrite(A0, !hasCubeHigh);
-
-  // A1 --> Cube in good position
-  digitalWrite(A1, cubeInPosition && (currentGoodReadingCount == 0));
-
-  // A2 --> We think we're up against a wall.
-  digitalWrite(A2, againstWall);
-
-  // A3 --> Cube in poor position but driver may act if desired
-  digitalWrite(A3, hasCubeLow);
-
-  if (!IS_I2C_SLAVE) {
-    // A4 --> found a stack of cubes
-    digitalWrite(A4, foundStack);
-  }
 
 // Debugging output
   if (debugging) {
@@ -221,12 +179,7 @@ void loop() {
       //Serial.print(distances[i] / 25.4);
     }
   
-    Serial.print(hasCubeHigh ?      "Got Cube         " : "No Cube          ");
-    Serial.print(hasCubeLow ?       "Cube Close       " : "Cube Not Close   ");
-    Serial.print(cubeInPosition ?   "Ready            " : "Not Ready        ");
-    Serial.print(againstWall ?      "Wall  " : "      ");
-    Serial.print(cubeActionable ? "Strafe " : "       ");
-    Serial.println(readCount);
+    Serial.println();
   }
 
   if (Serial.available() > 0) {
@@ -238,40 +191,40 @@ void loop() {
     }
   }
 
-  if (USE_DIAG_LIGHTS) {
-    leds[0] = distances[0] > MIN_CUBE_DISTANCE && distances[0] < NEAR_CUBE_DISTANCE ? CRGB::Blue : CRGB::Red;
-    leds[1] = distances[1] > MIN_CUBE_DISTANCE && distances[1] < NEAR_CUBE_DISTANCE ? CRGB::Blue : CRGB::Red;
-    leds[2] = distances[2] > MIN_CUBE_DISTANCE && distances[2] < NEAR_CUBE_DISTANCE ? CRGB::Blue : CRGB::Red;
-    leds[3] = distances[3] > MIN_CUBE_DISTANCE && distances[3] < NEAR_CUBE_DISTANCE ? CRGB::Blue : CRGB::Red;
-  
-    leds[5] = cubeInPosition ? CRGB::Blue : CRGB::Red;
-    leds[6] = cubeActionable ? CRGB::Blue : CRGB::Red;
-  
-    leds[8] = hasCubeLow ? CRGB::Blue : CRGB::Red;
-    leds[9] = hasCubeHigh ? CRGB::Blue : CRGB::Red;
-  
-    leds[11] = foundStack ? CRGB::Blue : CRGB::Red;
-    leds[12] = againstWall ? CRGB::Blue : CRGB::Red;
-
-    int strandColor = CRGB::Blue;
-    int topMark = 14;
-    if (hasCubeHigh) {
-      topMark = NUM_LEDS;
-    } else if (hasCubeLow) {
-      topMark = 2 * NUM_LEDS / 3;
-    } else if (cubeInPosition) {
-      topMark = NUM_LEDS / 2;
-    } else if (cubeActionable) {
-      topMark = NUM_LEDS / 4;
-    } else {
-      topMark = NUM_LEDS;
-      strandColor = CRGB::Green;
-    }
-    for (int i = 14; i < NUM_LEDS; i++) {
-      leds[i] = (i < topMark) ? strandColor : CRGB::Black;
-    }
-    FastLED.show();
-  }
+//  if (USE_DIAG_LIGHTS) {
+//    leds[0] = distances[0] > MIN_CUBE_DISTANCE && distances[0] < NEAR_CUBE_DISTANCE ? CRGB::Blue : CRGB::Red;
+//    leds[1] = distances[1] > MIN_CUBE_DISTANCE && distances[1] < NEAR_CUBE_DISTANCE ? CRGB::Blue : CRGB::Red;
+//    leds[2] = distances[2] > MIN_CUBE_DISTANCE && distances[2] < NEAR_CUBE_DISTANCE ? CRGB::Blue : CRGB::Red;
+//    leds[3] = distances[3] > MIN_CUBE_DISTANCE && distances[3] < NEAR_CUBE_DISTANCE ? CRGB::Blue : CRGB::Red;
+//  
+//    leds[5] = cubeInPosition ? CRGB::Blue : CRGB::Red;
+//    leds[6] = cubeActionable ? CRGB::Blue : CRGB::Red;
+//  
+//    leds[8] = hasCubeLow ? CRGB::Blue : CRGB::Red;
+//    leds[9] = hasCubeHigh ? CRGB::Blue : CRGB::Red;
+//  
+//    leds[11] = foundStack ? CRGB::Blue : CRGB::Red;
+//    leds[12] = againstWall ? CRGB::Blue : CRGB::Red;
+//
+//    int strandColor = CRGB::Blue;
+//    int topMark = 14;
+//    if (hasCubeHigh) {
+//      topMark = NUM_LEDS;
+//    } else if (hasCubeLow) {
+//      topMark = 2 * NUM_LEDS / 3;
+//    } else if (cubeInPosition) {
+//      topMark = NUM_LEDS / 2;
+//    } else if (cubeActionable) {
+//      topMark = NUM_LEDS / 4;
+//    } else {
+//      topMark = NUM_LEDS;
+//      strandColor = CRGB::Green;
+//    }
+//    for (int i = 14; i < NUM_LEDS; i++) {
+//      leds[i] = (i < topMark) ? strandColor : CRGB::Black;
+//    }
+//    FastLED.show();
+//  }
 
   if (USE_OLED_DISPLAY) {
     for (int q = 0; q < NUM_SENSORS; q++) {
@@ -287,63 +240,9 @@ void loop() {
       digitalWrite(A5, heartbeat);
     }
   }
-  
-  //delay(5);
-}
 
-bool checkForWall(short distances[], int threshold) {
-  String currentState = String("");
-  for (int i = 0; i < 4; i++) {
-    if (distances[i] > MIN_CUBE_DISTANCE && distances[i] < threshold) {
-      currentState += (char)('1' + i);
-    }
+  while(millis() < time_now + 50) { 
+    // Loop every 50 milliseconds.
   }
-  for (int i = 0; i < ArraySize(wallValues); i++) {
-    if (currentState.equals(wallValues[i])) {
-      return true;
-    }
-  }
-  return false;
-   
-}
 
-bool checkForGoodCubes(short distances[], int threshold) {
-  String currentState = String("");
-  for (int i = 0; i < 4; i++) {
-    if (distances[i] > MIN_CUBE_DISTANCE && distances[i] < threshold) {
-      currentState += (char)('1' + i);
-    }
-  }
-  for (int i = 0; i < ArraySize(goodValues); i++) {
-    if (currentState.equals(goodValues[i])) {
-      return true;
-    }
-  }
-  return false;
-}
-
-bool checkForActionableCubes(short distances[], int threshold) {
-  String currentState = String("");
-  for (int i = 0; i < 4; i++) {
-    if (distances[i] > MIN_CUBE_DISTANCE && distances[i] < threshold) {
-      currentState += (char)('1' + i);
-    }
-  }
-  for (int i = 0; i < ArraySize(actionableValues); i++) {
-    if (currentState.equals(actionableValues[i])) {
-      return true;
-    }
-  }
-  return false;
-}
-
-bool checkForCubeStack(short distances[]) {
-  short difference = avg(distances[0], distances[3]) - avg(distances[1], distances[2]);
-  if ((abs(distances[0] - distances[3]) < 50) 
-   && (abs(distances[1] - distances[2]) < 50) 
-   && (difference > 280 && difference < 350 )
-   ) {
-    return true;
-  }
-  return false;
 }
