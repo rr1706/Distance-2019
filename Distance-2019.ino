@@ -18,7 +18,7 @@
 #define LED_CLOCK_PIN 13
 
 #define COMMON_I2C_CLOCK_PIN 2
-#define NUM_SENSORS 4
+#define NUM_SENSORS 7
 
 #define IS_I2C_SLAVE true
 #define USE_DIAG_LIGHTS false
@@ -35,7 +35,7 @@
 #define MAX_CUBE_DISTANCE 330
 
 #define GOOD_SENSOR_DELAY 5
-#define SENSOR_GRIPPER 4
+#define SENSOR_GRIPPER 7
 
 template< typename T, size_t N > size_t ArraySize (T (&) [N]){ return N; }
 
@@ -65,7 +65,7 @@ void setup() {
   while(!Serial);
   Serial.begin(115200);
 
-  Serial.print("Number of good items: ");Serial.println(ArraySize(goodValues));
+  //Serial.print("Number of good items: ");Serial.println(ArraySize(goodValues));
 
   if (IS_I2C_SLAVE) {
     // Start the i2c interface as slave at address 8.
@@ -78,6 +78,7 @@ void setup() {
   // Initialize the range finders...
   for (int i = 0; i < NUM_SENSORS; i++) {
     wires[i] = new SoftwareWire(i + 3, COMMON_I2C_CLOCK_PIN);
+    wires[i]->setClock(400000UL);
     wires[i]->begin();
     sensors[i] = new SoftVL53L1X(wires[i]);
 
@@ -87,9 +88,9 @@ void setup() {
     } else {
       sensorsExist[i] = true;
       sensors[i]->setTimeout(500);
-      sensors[i]->setDistanceMode(VL53L1X::Long);
-      sensors[i]->setMeasurementTimingBudget(50000);
-      sensors[i]->startContinuous(50);
+      sensors[i]->setDistanceMode(VL53L1X::Medium);
+      sensors[i]->setMeasurementTimingBudget(40000);
+      sensors[i]->startContinuous(40);
     }
   }
 
@@ -114,6 +115,8 @@ void setup() {
     }
   } else if (USE_OLED_DISPLAY) {
     oledDisplayWire = new SoftwareWire(10, COMMON_I2C_CLOCK_PIN, true, false);
+    oledDisplayWire->setTimeout(25); // 25ms
+    oledDisplayWire->setClock(400000UL);
     oledDisplayWire->begin();
     initOledDisplay(*oledDisplayWire);
   }
@@ -128,13 +131,13 @@ void setup() {
  */
 void requestEvent() {
   readCount++;
-  byte dataToSend[8] = {0};
-  for (int i = 0; i < 4; i++) {
+  byte dataToSend[NUM_SENSORS * 2] = {0};
+  for (int i = 0; i < NUM_SENSORS; i++) {
     short data = distances[i]; // * 10 / 254;
     dataToSend[i * 2] = (data >> 8) & 0xff;
     dataToSend[i * 2 + 1] = data & 0xff;
   }
-  Wire.write(dataToSend, 8);
+  Wire.write(dataToSend, NUM_SENSORS * 2);
 }
 
 /**
@@ -164,7 +167,7 @@ void loop() {
         if (debugging) { Serial.print("Timeour detected, re-initializing sensor #"); Serial.print(i); }
         if (sensors[i]->init()) {
           sensors[i]->setTimeout(500);
-          sensors[i]->setDistanceMode(VL53L1X::Long);
+          sensors[i]->setDistanceMode(VL53L1X::Medium);
           sensors[i]->setMeasurementTimingBudget(50000);
           sensors[i]->startContinuous(50);
         }

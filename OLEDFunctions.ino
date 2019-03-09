@@ -7,6 +7,7 @@
 
 
 //int values[8];
+int lastValues[8] = {0};
 
 int writeCmd(SoftwareWire &myWire, byte cmd) {
   myWire.beginTransmission(OLED_ADDRESS);
@@ -60,16 +61,19 @@ int writeData(SoftwareWire &myWire, byte* data, int count) {
 
 void drawLine(SoftwareWire &myWire, int page, int value) {
   byte buffer[132] = {0};
-  for (int i = 0; i < 132; i++) {
-    buffer[i] = (value > i) ? 0x03C : 0;
+  int startPoint = min(value, lastValues[page]);
+  int endPoint = min(132, max(value + 1, lastValues[page]));
+  for (int i = 0; i < value; i++) {
+    buffer[i] = 0x03C;
   }
   writeCmd(myWire, (byte)0xB0 + page);  // Set page
-  writeCmd(myWire, (byte)0x00);  // Set Column 0
-  writeCmd(myWire, (byte)0x10);  // Set Column 0
-  if (writeData(myWire, buffer, 132) != 0) {
+  writeCmd(myWire, (byte)(startPoint & 0x0f));  // Set Column 0
+  writeCmd(myWire, (byte)(16 + startPoint / 16));  // Set Column 0
+  if (writeData(myWire, buffer + startPoint, endPoint - startPoint) != 0) {
     Serial.println("Re-initializing display");
     initOledDisplay(myWire);
   }
+  lastValues[page] = value;
 }
 
 void initOledDisplay(SoftwareWire &myWire) {
