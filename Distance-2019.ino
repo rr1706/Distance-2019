@@ -68,7 +68,7 @@ void setup() {
   // Initialize the range finders...
   for (int i = 0; i < NUM_SENSORS; i++) {
     wires[i] = new SoftwareWire(i + 3, COMMON_I2C_CLOCK_PIN);
-    wires[i]->setClock(400000UL);
+    //wires[i]->setClock(400000UL);
     wires[i]->begin();
     sensors[i] = new SoftVL53L1X(wires[i]);
 
